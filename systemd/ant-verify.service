@@ -1,0 +1,17 @@
+[Unit]
+Description=ANT Automobile document verification
+After=network.target
+
+[Service]
+User=ant-verify
+Group=ant-verify
+ExecStart=/usr/bin/python3 -I /usr/local/bin/ant-verify serve
+Restart=always
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadOnlyPaths=/var/lib/ant-verify
+
+[Install]
+WantedBy=multi-user.target

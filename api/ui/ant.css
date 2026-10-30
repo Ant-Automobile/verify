@@ -1,0 +1,4 @@
+:root { color-scheme: light; }
+body { margin: 0; background: #fff; }
+.swagger-ui .info { margin: 32px 0 16px; }
+.swagger-ui .wrapper { padding: 0 16px; }

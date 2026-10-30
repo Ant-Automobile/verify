@@ -1,0 +1,164 @@
+swagger: "2.0"
+info:
+  title: ANT Automobile API
+  version: "1.0"
+  description: |
+    Verification of official documents issued by ANT Automobile.
+
+    To look up a document you need its document number (printed in the verification box at the bottom of the
+    document) or the SHA-256 digest of its PDF file. There is no list of registered documents.
+
+    Verification page for people: https://verify.antautomobile.org/
+
+    Rate limit: 5 requests per second per IP (429 when exceeded).
+
+    The document number, name, date and digest in the examples are illustrative and do not belong to a real document.
+  contact:
+    name: ANT Automobile
+    email: info@antautomobile.org
+    url: https://antautomobile.org
+host: api.antautomobile.org
+basePath: /
+schemes:
+  - https
+produces:
+  - application/json
+tags:
+  - name: verify
+    description: Document verification
+
+paths:
+  /v1/verify/{document_no}:
+    get:
+      tags: [verify]
+      summary: Verify by document number
+      description: |
+        Returns the status of the document. If `sha256` is given, the response also says whether your file is
+        identical to the registered document (`file_matches`). The number may be written in lowercase or without dashes.
+      operationId: verifyByNumber
+      parameters:
+        - $ref: "#/parameters/document_no"
+        - $ref: "#/parameters/sha256_optional"
+      responses:
+        "200":
+          description: Document found
+          schema:
+            $ref: "#/definitions/Document"
+          examples:
+            application/json:
+              document_no: ANT-7K2M-Q9XD-4HTB-W3PN
+              status: valid
+              issuer: ANT Automobile
+              signed_by: Name Surname
+              issued_on: "2026-01-15"
+              verify_url: https://verify.antautomobile.org/ANT-7K2M-Q9XD-4HTB-W3PN
+              file_matches: true
+        "400":
+          description: Malformed number or digest (`invalid_document_no`, `invalid_sha256`)
+          schema:
+            $ref: "#/definitions/Error"
+        "404":
+          description: No document is registered with this number
+          schema:
+            $ref: "#/definitions/NotFound"
+        "429":
+          description: Too many requests
+
+  /v1/verify:
+    get:
+      tags: [verify]
+      summary: Verify by file digest
+      description: |
+        Returns the document whose registered SHA-256 digest equals the digest of the PDF (`file_matches` is always
+        `true`). Digest: `sha256sum document.pdf`.
+      operationId: verifyByFile
+      parameters:
+        - $ref: "#/parameters/sha256_required"
+      responses:
+        "200":
+          description: This file is a registered document
+          schema:
+            $ref: "#/definitions/Document"
+        "400":
+          description: Digest missing or malformed (`missing_sha256`, `invalid_sha256`)
+          schema:
+            $ref: "#/definitions/Error"
+        "404":
+          description: This file is not in our records (modified, or not issued by us)
+          schema:
+            $ref: "#/definitions/NotFound"
+        "429":
+          description: Too many requests
+
+parameters:
+  document_no:
+    name: document_no
+    in: path
+    required: true
+    type: string
+    description: Document number
+    x-example: ANT-7K2M-Q9XD-4HTB-W3PN
+  sha256_optional:
+    name: sha256
+    in: query
+    required: false
+    type: string
+    pattern: "^[0-9a-fA-F]{64}$"
+    description: SHA-256 digest of your PDF file (64 hex characters)
+  sha256_required:
+    name: sha256
+    in: query
+    required: true
+    type: string
+    pattern: "^[0-9a-fA-F]{64}$"
+    description: SHA-256 digest of the PDF file (64 hex characters)
+    x-example: 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
+
+definitions:
+  Document:
+    type: object
+    required: [document_no, status, issuer, signed_by, issued_on, verify_url]
+    properties:
+      document_no:
+        type: string
+        pattern: "^ANT-[0-9A-HJKMNP-TV-Z]{4}(-[0-9A-HJKMNP-TV-Z]{4}){3}$"
+        description: Canonical document number
+        example: ANT-7K2M-Q9XD-4HTB-W3PN
+      status:
+        type: string
+        enum: [valid, revoked, superseded]
+        description: |
+          `valid` · `revoked` · `superseded` (a newer document replaced it;
+          the number of the new document is not disclosed)
+      issuer:
+        type: string
+        description: Issuer
+        example: ANT Automobile
+      signed_by:
+        type: string
+        description: Signer
+        example: Name Surname
+      issued_on:
+        type: string
+        format: date
+        description: Issue date
+        example: "2026-01-15"
+      verify_url:
+        type: string
+        description: Verification page for people
+        example: https://verify.antautomobile.org/ANT-7K2M-Q9XD-4HTB-W3PN
+      file_matches:
+        type: boolean
+        description: Only when `sha256` is sent; `true` if the file is identical to the registered document
+  NotFound:
+    type: object
+    properties:
+      status:
+        type: string
+        enum: [not_found]
+  Error:
+    type: object
+    properties:
+      error:
+        type: string
+        enum: [invalid_document_no, invalid_sha256, missing_sha256, not_found, method_not_allowed]
